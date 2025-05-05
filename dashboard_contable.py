@@ -4,7 +4,7 @@ import plotly.express as px
 
 # Configuración de la página
 st.set_page_config(
-    page_title="Dashboard Contable Dinámico",
+    page_title="Dashboard Contable Ende Corani S.A.",
     layout="wide",
 )
 
@@ -24,7 +24,7 @@ st.markdown(
 )
 
 # Título
-st.title("📊 Dashboard Contable Dinámico y Responsive")
+st.title("📊 Dashboard Contable - GAF")
 
 # Cargar archivo Excel desde interfaz
 uploaded_file = st.file_uploader("Sube tu archivo Excel", type=["xlsx"], help="Selecciona un archivo .xlsx con tus datos contables.")
