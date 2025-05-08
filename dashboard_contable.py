@@ -3,113 +3,166 @@ import pandas as pd
 import plotly.express as px
 
 # Configuración de la página
-st.set_page_config(
-    page_title="Dashboard Contable Ende Corani S.A.",
-    layout="wide",
-)
+st.set_page_config(page_title="Dashboard Contable y Presupuestario", layout="wide")
+st.title("📊 Dashboard Contable y Presupuestario")
 
-# Estilos CSS personalizados
-st.markdown(
-    """
-    <style>
-        .stMetric {
-            font-size: 18px;
-        }
-        /* Ajuste de margenes de gráfico */
-        .js-plotly-plot .main-svg {
-            margin: 0px !important;
-        }
-    </style>
-    """, unsafe_allow_html=True
-)
-
-# Título
-st.title("📊 Dashboard Contable - GAF")
-
-# Cargar archivo Excel desde interfaz
-uploaded_file = st.file_uploader("Sube tu archivo Excel", type=["xlsx"], help="Selecciona un archivo .xlsx con tus datos contables.")
+# Subida de archivo Excel
+uploaded_file = st.file_uploader("Sube tu archivo Excel", type=["xlsx"], help="Debe contener hojas: CONTABILIDAD y PRESUPUESTOS")
 
 if uploaded_file:
-    # Cargar datos
-    df = pd.read_excel(uploaded_file)
+    try:
+        # Cargar hojas
+        df_contabilidad = pd.read_excel(uploaded_file, sheet_name="CONTABILIDAD")
+        df_presupuesto = pd.read_excel(uploaded_file, sheet_name="PRESUPUESTOS")
 
-    # Procesamiento de datos
-    # Crear columna de tipo de comprobante desde prefijo de NUMERO CBTE
-    df["TIPO CBTE"] = df["NUMERO CBTE"].astype(str).str[:2]
-    # Convertir FECHA a datetime y extraer MES y AÑO
-    df["FECHA"] = pd.to_datetime(df["FECHA"])
-    df["MES"] = df["FECHA"].dt.strftime("%B")
-    df["AÑO"] = df["FECHA"].dt.year
+        tab1, tab2 = st.tabs(["📊 CONTABILIDAD", "📈 PRESUPUESTOS"])
 
-    # Mostrar datos originales en expander
-    with st.expander("📄 Ver datos originales"):
-        st.dataframe(df)
+        # ----------- TAB CONTABILIDAD ----------- 
+        with tab1:
+            st.header("📊 Análisis Contable")
 
-    # Barra lateral de filtros
-    st.sidebar.header("Filtros")
-    with st.sidebar.expander("Configurar filtros"):
-        tipo_cbte = st.multiselect("Tipo de Comprobante", df["TIPO CBTE"].unique())
-        usuario = st.multiselect("Usuario", df["USUARIO"].unique())
-        partida = st.multiselect("Partida Presupuestaria", df["PARTIDA"].unique())
-        cuenta = st.multiselect("Cuenta Contable", df["CUENTA"].unique())
-        centro_costo = st.multiselect("Centro de Costo", df["CENTRO COSTO"].unique())
-        año = st.multiselect("Año", df["AÑO"].unique())
+            # Filtros generales para contabilidad
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                meses_ctb = st.multiselect("Mes", df_contabilidad["Mes"].unique(), default=df_contabilidad["Mes"].unique())
+            with col2:
+                estados = st.multiselect("Estado Financiero", df_contabilidad["Estado Financiero"].unique())
+            with col3:
+                tipos = st.multiselect("Tipo cuenta", df_contabilidad["Tipo cuenta"].unique())
 
-    # Aplicar filtros al DataFrame
-    df_filtrado = df.copy()
-    if tipo_cbte:
-        df_filtrado = df_filtrado[df_filtrado["TIPO CBTE"].isin(tipo_cbte)]
-    if usuario:
-        df_filtrado = df_filtrado[df_filtrado["USUARIO"].isin(usuario)]
-    if partida:
-        df_filtrado = df_filtrado[df_filtrado["PARTIDA"].isin(partida)]
-    if cuenta:
-        df_filtrado = df_filtrado[df_filtrado["CUENTA"].isin(cuenta)]
-    if centro_costo:
-        df_filtrado = df_filtrado[df_filtrado["CENTRO COSTO"].isin(centro_costo)]
-    if año:
-        df_filtrado = df_filtrado[df_filtrado["AÑO"].isin(año)]
+            dfc = df_contabilidad.copy()
+            if meses_ctb:
+                dfc = dfc[dfc["Mes"].isin(meses_ctb)]
+            if estados:
+                dfc = dfc[dfc["Estado Financiero"].isin(estados)]
+            if tipos:
+                dfc = dfc[dfc["Tipo cuenta"].isin(tipos)]
 
-    # Cálculo de KPIs
-    ingresos = df_filtrado[df_filtrado["IMPORTE"] > 0]["IMPORTE"].sum()
-    egresos = df_filtrado[df_filtrado["IMPORTE"] < 0]["IMPORTE"].sum()
-    saldo = ingresos + egresos
-    promedio_mensual = df_filtrado.groupby("MES")["IMPORTE"].sum().mean()
+            # KPIs contables
+            st.subheader("🔢 KPIs Contables")
+            total_activo = dfc[dfc["Tipo cuenta"] == "ACTIVO"]["Monto Bs (constantes)"].sum()
+            total_pasivo = dfc[dfc["Tipo cuenta"] == "PASIVO"]["Monto Bs (constantes)"].sum()
+            total_patrimonio = dfc[dfc["Tipo cuenta"] == "PATRIMONIO"]["Monto Bs (constantes)"].sum()
 
-    # Mostrar KPIs en dos columnas por fila para mejor responsividad
-    st.subheader("🔢 KPIs")
-    col1, col2 = st.columns(2)
-    col3, col4 = st.columns(2)
-    col1.metric("🟢 Ingresos (Bs)", f"{ingresos:,.2f}")
-    col2.metric("🔴 Egresos (Bs)", f"{egresos:,.2f}")
-    col3.metric("⚖️ Saldo (Bs)", f"{saldo:,.2f}")
-    col4.metric("📅 Promedio Mensual (Bs)", f"{promedio_mensual:,.2f}")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("💰 Total Activo (Bs)", f"{total_activo:,.2f}")
+            col2.metric("💰 Total Pasivo (Bs)", f"{total_pasivo:,.2f}")
+            col3.metric("💰 Total Patrimonio (Bs)", f"{total_patrimonio:,.2f}")
 
-    # Selección de tipo de gráfico
-    st.sidebar.header("Gráficos")
-    chart_type = st.sidebar.selectbox(
-        "Selecciona el tipo de gráfico", ["Barras", "Líneas", "Área"], index=0
-    )
+            # Gráfico de barras por tipo de cuenta
+            st.subheader("📊 Monto por Tipo de Cuenta")
+            fig1 = px.bar(
+                dfc,
+                x="Tipo cuenta",
+                y="Monto Bs (constantes)",
+                color="Subtipo cuenta",
+                barmode="group",
+                text="Mes"
+            )
+            fig1.update_traces(textposition="outside")
+            st.plotly_chart(fig1, use_container_width=True)
 
-    # Gráfico de movimiento mensual
-    st.subheader("📈 Movimiento Mensual")
-    if chart_type == "Barras":
-        fig = px.bar(
-            df_filtrado, x="MES", y="IMPORTE", color="TIPO CBTE", title="Ingresos y Egresos por Mes"
-        )
-    elif chart_type == "Líneas":
-        fig = px.line(
-            df_filtrado, x="MES", y="IMPORTE", color="TIPO CBTE", title="Ingresos y Egresos por Mes"
-        )
-    else:
-        fig = px.area(
-            df_filtrado, x="MES", y="IMPORTE", color="TIPO CBTE", title="Ingresos y Egresos por Mes"
-        )
-    st.plotly_chart(fig, use_container_width=True)
+            # Filtros específicos para indicadores financieros
+            st.subheader("📊 Indicadores Financieros por Mes")
+            col1, col2 = st.columns(2)
+            with col1:
+                tipos_razon = st.multiselect("Tipo de razón financiera", dfc["Tipo Razon Financiera"].dropna().unique())
+            with col2:
+                meses_razon = st.multiselect("Mes", dfc["Mes"].unique())
 
-    # Tabla de datos filtrados en expander
-    with st.expander("📋 Detalle de Transacciones Filtradas"):
-        st.dataframe(df_filtrado)
+            df_razon = dfc.copy()
+            if tipos_razon:
+                df_razon = df_razon[df_razon["Tipo Razon Financiera"].isin(tipos_razon)]
+            if meses_razon:
+                df_razon = df_razon[df_razon["Mes"].isin(meses_razon)]
 
+            if not df_razon.empty:
+                fig2 = px.bar(
+                    df_razon,
+                    x="Mes",
+                    y="Valor medicion",
+                    color="Tipo Razon Financiera",
+                    barmode="group",
+                    text="Valor medicion"
+                )
+                fig2.update_traces(textposition="outside")
+                st.plotly_chart(fig2, use_container_width=True)
+            else:
+                st.warning("No hay datos para los filtros seleccionados.")
+
+            with st.expander("📄 Ver datos contables filtrados"):
+                st.dataframe(dfc)
+
+        # ----------- TAB PRESUPUESTOS ----------- 
+        with tab2:
+            st.header("📈 Análisis Presupuestario")
+
+            # Filtros
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                meses = st.multiselect("Mes", df_presupuesto["Mes"].unique(), default=df_presupuesto["Mes"].unique())
+            with col2:
+                gastos = st.multiselect("Tipo de Gasto", df_presupuesto["Tipo de Gasto"].unique())
+            with col3:
+                sedes = st.multiselect("Sede", df_presupuesto["Sede"].unique())
+
+            dfp = df_presupuesto.copy()
+            if meses:
+                dfp = dfp[dfp["Mes"].isin(meses)]
+            if gastos:
+                dfp = dfp[dfp["Tipo de Gasto"].isin(gastos)]
+            if sedes:
+                dfp = dfp[dfp["Sede"].isin(sedes)]
+
+            # KPIs
+            st.subheader("🔢 KPIs Presupuestarios")
+            meta_total = dfp["Valor Meta 2024"].sum()
+            real_total = dfp["Valor Real 2024"].sum()
+            col1, col2 = st.columns(2)
+            col1.metric("🎯 Total Meta 2024 (Bs)", f"{meta_total:,.2f}")
+            col2.metric("✅ Total Real 2024 (Bs)", f"{real_total:,.2f}")
+
+            # Comparativo Meta vs Real
+            st.subheader("📊 Comparativo Meta vs Real por Cuenta")
+            fig3 = px.bar(
+                dfp,
+                x="Cuenta",
+                y=["Valor Meta 2024", "Valor Real 2024"],
+                barmode="group",
+                text_auto=True
+            )
+            st.plotly_chart(fig3, use_container_width=True)
+
+            # Evolución mensual
+            st.subheader("📈 Evolución Mensual")
+            dfp_grouped = dfp.groupby("Mes")[["Valor Meta 2024", "Valor Real 2024"]].sum().reset_index()
+
+            fig4 = px.line(
+                dfp_grouped,
+                x="Mes",
+                y=["Valor Meta 2024", "Valor Real 2024"],
+                markers=True
+            )
+
+            fig4.update_traces(
+                text=dfp_grouped["Valor Meta 2024"].apply(lambda x: f"{x:,.2f}"),
+                textposition="top center",
+                textfont_color="white",
+                selector=dict(name="Valor Meta 2024")
+            )
+            fig4.update_traces(
+                text=dfp_grouped["Valor Real 2024"].apply(lambda x: f"{x:,.2f}"),
+                textposition="top center",
+                textfont_color="white",
+                selector=dict(name="Valor Real 2024")
+            )
+
+            st.plotly_chart(fig4, use_container_width=True)
+
+            with st.expander("📄 Ver datos presupuestarios filtrados"):
+                st.dataframe(dfp)
+
+    except Exception as e:
+        st.error(f"Error al procesar el archivo: {e}")
 else:
-    st.info("Por favor, sube un archivo Excel para comenzar.")
+    st.info("Por favor, sube un archivo Excel que contenga las hojas 'CONTABILIDAD' y 'PRESUPUESTOS'.")
