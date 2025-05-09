@@ -1,0 +1,113 @@
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+
+# Configuración de la página
+st.set_page_config(page_title="Dashboard Contable y Presupuestario", layout="wide")
+st.title("📊 Dashboard Contable y Presupuestario")
+
+# Subida de archivo Excel
+uploaded_file = st.file_uploader("Sube tu archivo Excel", type=["xlsx"], help="Debe contener hojas: CONTABILIDAD y PRESUPUESTOS")
+
+if uploaded_file:
+    try:
+        # Cargar hojas
+        df_contabilidad = pd.read_excel(uploaded_file, sheet_name="CONTABILIDAD")
+        df_presupuesto = pd.read_excel(uploaded_file, sheet_name="PRESUPUESTOS")
+
+        tab1, tab2 = st.tabs(["📊 CONTABILIDAD", "📈 PRESUPUESTOS"])
+
+        # ----------- TAB CONTABILIDAD -----------
+        with tab1:
+            st.header("📊 Análisis Contable")
+
+            # Filtros
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                años = st.multiselect("Año", df_contabilidad["Año"].unique(), default=df_contabilidad["Año"].unique())
+            with col2:
+                estados = st.multiselect("Estado Financiero", df_contabilidad["Estado Financiero"].unique())
+            with col3:
+                tipos = st.multiselect("Tipo cuenta", df_contabilidad["Tipo cuenta"].unique())
+
+            # Aplicar filtros
+            dfc = df_contabilidad.copy()
+            if años:
+                dfc = dfc[dfc["Año"].isin(años)]
+            if estados:
+                dfc = dfc[dfc["Estado Financiero"].isin(estados)]
+            if tipos:
+                dfc = dfc[dfc["Tipo cuenta"].isin(tipos)]
+
+            # KPIs básicos
+            st.subheader("🔢 Indicadores Clave")
+            total_monto = dfc["Monto Bs (constantes)"].sum()
+            razon_avg = dfc["Valor medicion"].mean()
+            col1, col2 = st.columns(2)
+            col1.metric("💰 Total Monto (Bs)", f"{total_monto:,.2f}")
+            col2.metric("📈 Promedio Razón Financiera", f"{razon_avg:.2f}")
+
+            # Gráfico de barras por tipo de cuenta
+            st.subheader("📊 Monto por Tipo de Cuenta")
+            fig1 = px.bar(dfc, x="Tipo cuenta", y="Monto Bs (constantes)", color="Subtipo cuenta", barmode="group")
+            st.plotly_chart(fig1, use_container_width=True)
+
+            # Gráfico de razones financieras
+            st.subheader("📊 Indicadores Financieros")
+            fig2 = px.bar(dfc, x="Razon Financiera", y="Valor medicion", color="Tipo Razon Financiera")
+            st.plotly_chart(fig2, use_container_width=True)
+
+            with st.expander("📄 Ver datos contables filtrados"):
+                st.dataframe(dfc)
+
+        # ----------- TAB PRESUPUESTOS -----------
+        with tab2:
+            st.header("📈 Análisis Presupuestario")
+
+            # Filtros
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                meses = st.multiselect("Mes", df_presupuesto["Mes"].unique(), default=df_presupuesto["Mes"].unique())
+            with col2:
+                gastos = st.multiselect("Tipo de Gasto", df_presupuesto["Tipo de Gasto"].unique())
+            with col3:
+                sedes = st.multiselect("Sede", df_presupuesto["Sede"].unique())
+
+            # Aplicar filtros
+            dfp = df_presupuesto.copy()
+            if meses:
+                dfp = dfp[dfp["Mes"].isin(meses)]
+            if gastos:
+                dfp = dfp[dfp["Tipo de Gasto"].isin(gastos)]
+            if sedes:
+                dfp = dfp[dfp["Sede"].isin(sedes)]
+
+            # KPIs
+            st.subheader("🔢 KPIs Presupuestarios")
+            meta_total = dfp["Valor Meta 2024"].sum()
+            real_total = dfp["Valor Real 2024"].sum()
+            col1, col2 = st.columns(2)
+            col1.metric("🎯 Total Meta 2024 (Bs)", f"{meta_total:,.2f}")
+            col2.metric("✅ Total Real 2024 (Bs)", f"{real_total:,.2f}")
+
+            # Comparativo Meta vs Real
+            st.subheader("📊 Comparativo Meta vs Real por Cuenta")
+            fig3 = px.bar(dfp, x="Cuenta", y=["Valor Meta 2024", "Valor Real 2024"], barmode="group")
+            st.plotly_chart(fig3, use_container_width=True)
+
+            # Evolución mensual
+            st.subheader("📈 Evolución Mensual")
+            dfp_grouped = dfp.groupby("Mes")[["Valor Meta 2024", "Valor Real 2024"]].sum().reset_index()
+            fig4 = px.line(dfp_grouped, x="Mes", y=["Valor Meta 2024", "Valor Real 2024"], markers=True)
+            st.plotly_chart(fig4, use_container_width=True)
+
+            with st.expander("📄 Ver datos presupuestarios filtrados"):
+                st.dataframe(dfp)
+
+    except Exception as e:
+        st.error(f"Error al procesar el archivo: {e}")
+else:
+    st.info("Por favor, sube un archivo Excel que contenga las hojas 'CONTABILIDAD' y 'PRESUPUESTOS'.")
+
+
+para contabilidad los indicadores clave quiero renombrarlos a KPIs, y quiero mostrar otros datos, como ser: Total Activo, Total Pasivo, Total Patrimonio. En las razones financieras quiero que se muestre un filtro de cada tipo de razón financiera como ser: ROE, ROA, liquidez, etc. pero comparando por mes, no por año, para ello también la columna del archivo excel voy a modificar por mes, porque el dashboard se debe armar por mes para comparar mes a mes

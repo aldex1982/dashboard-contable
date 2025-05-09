@@ -1,9 +1,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from fpdf import FPDF
-import tempfile
-import plotly.io as pio
 
 # Configuración de la página
 st.set_page_config(page_title="Dashboard Contable y Presupuestario", layout="wide")
@@ -35,7 +32,7 @@ if uploaded_file:
             dfc = df_contabilidad[df_contabilidad["Mes"].isin(meses_ctb)]
             dfc = dfc[dfc["Cuenta"].isin(cuentas_ctb)]
 
-            # KPIs contables
+            # KPIs contables - siempre visibles, solo afecta filtro de mes
             df_kpi = df_contabilidad[df_contabilidad["Mes"].isin(meses_ctb)]
             total_activo = df_kpi[df_kpi["Cuenta"] == "ACTIVO"]["Importe Bs"].sum()
             total_pasivo = df_kpi[df_kpi["Cuenta"] == "PASIVO"]["Importe Bs"].sum()
@@ -151,65 +148,6 @@ if uploaded_file:
 
             with st.expander("📄 Ver datos presupuestarios filtrados"):
                 st.dataframe(dfp)
-
-        # ----------- EXPORTAR A PDF ----------- 
-        if st.button("Exportar a PDF y EXCEL"):
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_font("Arial", size=12)
-            pdf.cell(200, 10, txt="Dashboard Contable y Presupuestario", ln=True, align="C")
-
-            # Agregar KPIs contables
-            pdf.cell(200, 10, txt=f"Total Activo (Bs): {total_activo:,.2f}", ln=True)
-            pdf.cell(200, 10, txt=f"Total Pasivo (Bs): {total_pasivo:,.2f}", ln=True)
-            pdf.cell(200, 10, txt=f"Total Patrimonio (Bs): {total_patrimonio:,.2f}", ln=True)
-            pdf.cell(200, 10, txt=f"Total Ingresos (Bs): {total_ingresos:,.2f}", ln=True)
-            pdf.cell(200, 10, txt=f"Total Egresos (Bs): {total_egresos:,.2f}", ln=True)
-            pdf.cell(200, 10, txt=f"Utilidad (Bs): {utilidad:,.2f}", ln=True)
-
-            # Función para agregar imagen con control de espacio
-            def add_image_to_pdf(pdf, image_path):
-                pdf.image(image_path, x=10, y=pdf.get_y(), w=180)
-                pdf.ln(85)
-                if pdf.get_y() > 250:  # Si el contenido está muy cerca del final de la página
-                    pdf.add_page()  # Añadir una nueva página
-
-            # Exportar todos los gráficos como imágenes
-            fig1_path = "figura1.png"
-            fig1.write_image(fig1_path)  # Asegúrate de tener kaleido instalado
-            add_image_to_pdf(pdf, fig1_path)
-
-            fig2_path = "figura2.png"
-            fig2.write_image(fig2_path)
-            add_image_to_pdf(pdf, fig2_path)
-
-            fig_utilidad_path = "figura_utilidad.png"
-            fig_utilidad.write_image(fig_utilidad_path)
-            add_image_to_pdf(pdf, fig_utilidad_path)
-
-            fig3_path = "figura3.png"
-            fig3.write_image(fig3_path)
-            add_image_to_pdf(pdf, fig3_path)
-
-            fig4_path = "figura4.png"
-            fig4.write_image(fig4_path)
-            add_image_to_pdf(pdf, fig4_path)
-
-            # Guardar archivo PDF en un archivo temporal
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
-                tmp_file_path = tmp_file.name
-                pdf.output(tmp_file_path)
-
-            with open(tmp_file_path, "rb") as f:
-                st.download_button(label="Descargar PDF", data=f, file_name="dashboard.pdf", mime="application/pdf")
-                
-            # Exportar archivo Excel
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_excel:
-                excel_file_path = tmp_excel.name
-                with pd.ExcelWriter(excel_file_path, engine='xlsxwriter') as writer:
-                    df_contabilidad.to_excel(writer, sheet_name="CONTABILIDAD")
-                    df_presupuesto.to_excel(writer, sheet_name="PRESUPUESTOS")
-                st.download_button(label="Descargar Excel", data=open(excel_file_path, "rb"), file_name="dashboard.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     except Exception as e:
         st.error(f"Error al procesar el archivo: {e}")
