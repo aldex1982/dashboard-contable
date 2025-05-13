@@ -107,32 +107,25 @@ if uploaded_file:
             with col1:
                 meses = st.multiselect("Mes", df_presupuesto["Mes"].unique(), default=df_presupuesto["Mes"].unique())
             with col2:
-                tipos = st.multiselect("Tipo", df_presupuesto["Tipo"].unique())
+                gastos = st.multiselect("Tipo", df_presupuesto["Tipo"].unique())
             with col3:
                 centros = st.multiselect("Centro de Responsabilidad", df_presupuesto["Grcia/Centro Resp"].unique())
 
             dfp = df_presupuesto.copy()
             if meses:
                 dfp = dfp[dfp["Mes"].isin(meses)]
-            if tipos:
-                dfp = dfp[dfp["Tipo"].isin(tipos)]
+            if gastos:
+                dfp = dfp[dfp["Tipo"].isin(gastos)]
             if centros:
                 dfp = dfp[dfp["Grcia/Centro Resp"].isin(centros)]
-
-            # Calcular porcentaje de ejecución
-            dfp["% Ejecución"] = dfp["Ejecucion 2025"] / dfp["Valor Presupuesto 2025"] * 100
-            dfp["% Ejecución"] = dfp["% Ejecución"].replace([float("inf"), -float("inf")], 0).fillna(0)
 
             # KPIs
             st.subheader("🔢 KPIs Presupuestarios")
             presupuesto_total = dfp["Valor Presupuesto 2025"].sum()
             ejecucion_total = dfp["Ejecucion 2025"].sum()
-            porcentaje_ejecucion_total = (ejecucion_total / presupuesto_total * 100) if presupuesto_total > 0 else 0
-
-            col1, col2, col3 = st.columns(3)
+            col1, col2 = st.columns(2)
             col1.metric("🎯 Total Presupuesto 2025 (Bs)", f"{presupuesto_total:,.2f}")
             col2.metric("✅ Total Ejecución 2025 (Bs)", f"{ejecucion_total:,.2f}")
-            col3.metric("📊 % Ejecución", f"{porcentaje_ejecucion_total:.2f} %")
 
             # Comparativo Presupuesto vs Ejecución por Partida
             st.subheader("📊 Comparativo Presupuesto vs Ejecución por Partida")
@@ -140,11 +133,11 @@ if uploaded_file:
                 dfp,
                 x="Partida",
                 y=["Valor Presupuesto 2025", "Ejecucion 2025"],
-                barmode="group"
+                barmode="group"  # ✅ Sin text_auto
             )
             st.plotly_chart(fig3, use_container_width=True)
 
-            # Evolución mensual
+            # Evolución mensual de presupuesto y ejecución
             st.subheader("📈 Evolución Mensual")
             dfp_grouped = dfp.groupby("Mes")[["Valor Presupuesto 2025", "Ejecucion 2025"]].sum().reset_index()
             fig4 = px.line(
@@ -155,25 +148,8 @@ if uploaded_file:
             )
             st.plotly_chart(fig4, use_container_width=True)
 
-            # Tabla con alertas visuales
-            st.subheader("🚦 Detalle por Partida con % Ejecución")
-
-            def color_alerta(val):
-                if val < 80:
-                    color = "background-color: #f8d7da"  # rojo claro
-                elif 80 <= val < 95:
-                    color = "background-color: #fff3cd"  # amarillo claro
-                else:
-                    color = "background-color: #d4edda"  # verde claro
-                return color
-
-            df_mostrar = dfp[["Mes", "Tipo", "Grcia/Centro Resp", "Partida", "Valor Presupuesto 2025", "Ejecucion 2025", "% Ejecución"]].copy()
-            styled_table = df_mostrar.style.format({"Valor Presupuesto 2025": "Bs {:,.2f}",
-                                                    "Ejecucion 2025": "Bs {:,.2f}",
-                                                    "% Ejecución": "{:.2f} %"}).applymap(color_alerta, subset=["% Ejecución"])
-
-            st.dataframe(styled_table, use_container_width=True)
-
+            with st.expander("📄 Ver datos presupuestarios filtrados"):
+                st.dataframe(dfp)
 
         # ----------- EXPORTAR A PDF ----------- 
         if st.button("Exportar a PDF y EXCEL"):
